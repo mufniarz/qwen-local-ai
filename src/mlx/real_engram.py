@@ -358,57 +358,32 @@ def dequantize_linear(module, backend: str = "numpy"):
     """
     import mlx.core as mx
 
-    # For QuantizedLinear, directly dequantize the stored weights.
-    # The identity matrix trick doesn't work because the quantized
-    # matrix has a different expanded shape than the input.
-    if isinstance(module, mx.nn.QuantizedLinear):
-        codes = np.asarray(module.data).astype(np.int32)
-        scales = np.asarray(module.scales).astype(np.float32)
-        groups = int(getattr(module, "groups", 0) or 0)
-        bits = int(getattr(module, "bits", 4))
-        # Dequantize: (rows, cols//groups, groups)
-        deq = (codes - (1 << (bits - 1))) / (1 << (bits - 1)) * scales[:, :, None]
-        rows = codes.shape[0]
-        cols = codes.shape[1] * groups if groups else codes.shape[1]
-        w = deq.reshape(rows, cols).astype(np.float32)
-        bias = getattr(module, "bias", None)
-        if bias is not None:
-            w = w - np.asarray(bias).astype(np.float32)[:, None]
-        if backend == "mlx":
-            return mx.array(w)
-        return w
-
-    # Plain Linear: use the identity matrix trick.
+    # Identity matrix trick works for both plain Linear and QuantizedLinear:
+    # calling the module with identity exercises its real (de)quantization path
+    # and extracting the output gives the exact weight matrix.
     if hasattr(module, "out_features"):
         out_dim = int(module.out_features)
         in_dim = int(module.in_features)
-    else:
-        # QuantizedLinear: get shape from the weight tensor.
-        # QuantizedLinear stores group-wise quantized codes; the
-        # .weight attribute is the dequantized float32 array.
-        w = getattr(module, "weight", None)
-        if w is None:
-            # Try .data (codes) + .scales for group-quantized layout
-            codes = getattr(module, "data", None)
-            scales = getattr(module, "scales", None)
-            groups = int(getattr(module, "groups", 0) or 0)
+    elif hasattr(module, "weight"):
+        # QuantizedLinear: .weight is quantized codes; infer shape from it.
+        w_q = module.weight
+        if w_q.ndim == 2:
+            out_dim, packed_dim = w_q.shape
             bits = int(getattr(module, "bits", 4))
-            if codes is not None and scales is not None:
-                # Dequantize: (rows, cols//groups, groups)
-                c = np.asarray(codes).astype(np.int32)
-                s = np.asarray(scales).astype(np.float32)
-                deq = (c - (1 << (bits - 1))) / (1 << (bits - 1)) * s[:, :, None]
-                rows = c.shape[0]
-                cols = c.shape[1] * groups if groups else c.shape[1]
-                w = deq.reshape(rows, cols).astype(np.float32)
-            else:
-                raise RuntimeError(
-                    f"Cannot extract dimensions from {type(module).__name__} "
-                    "(no .out_features, no .weight, no .data/.scales)"
-                )
+            group_size = int(getattr(module, "group_size", 64))
+            elems_per_word = 32 // bits  # 8 for 4-bit
+            num_groups = packed_dim // elems_per_word
+            in_dim = num_groups * group_size
         else:
-            w = np.asarray(w)
-        out_dim, in_dim = w.shape
+            raise RuntimeError(
+                f"Cannot extract dimensions from {type(module).__name__} "
+                f"(weight has {w_q.ndim} dims)"
+            )
+    else:
+        raise RuntimeError(
+            f"Cannot extract dimensions from {type(module).__name__} "
+            "(no .out_features, no .weight)"
+        )
 
     ident = mx.eye(in_dim).astype(mx.float32)
     y = module(ident).astype(mx.float32)  # (in, out) == Wᵀ
