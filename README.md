@@ -169,18 +169,22 @@ Python 3.13. Any Python 3.10+ works.)
 # 1. See what this machine can actually run (hardware + model fit):
 .venv/bin/python -m src.mlx.mlx_bridge --profile-only
 
-# 2. Run a real model (the bridge downloads from the Hugging Face Hub,
-#    caches in ~/.cache/huggingface, and generates):
+# 2. Run the real model from the transcript (Qwen3.8-Flash-Next, ~105 GB):
 .venv/bin/python -m src.mlx.mlx_bridge \
-    --model mlx-community/Qwen3-30B-A3B-4bit \
+    --model mlx-community/Qwen3.8-Flash-Next-4bit \
     --prompt "Explain mixture-of-experts routing in one paragraph" \
     --max-tokens 256
 
 # 3. With the real phrase book (built from the model's real embedding
 #    matrix, saved memory-mapped, page-fetched like the transcript's design):
 .venv/bin/python -m src.mlx.mlx_bridge \
-    --model mlx-community/Qwen3-30B-A3B-4bit \
+    --model mlx-community/Qwen3.8-Flash-Next-4bit \
     --engram-dir ./engram \
+    --prompt "..."
+
+# 4. Or run smaller models for testing:
+.venv/bin/python -m src.mlx.mlx_bridge \
+    --model mlx-community/Qwen3-30B-A3B-4bit \
     --prompt "..."
 ```
 
@@ -192,7 +196,7 @@ Python 3.13. Any Python 3.10+ works.)
 | MoE router | ✅ Real — the model's own gate weights (dequantized through its own matmul) + the Qwen3-MoE routing formula; `verify_moe_reimplementation()` proves it matches the model's own MoE block |
 | Expert compute | ✅ Real — the model's own expert storage (mlx-lm's fused `SwitchGLU`) |
 | Phrase book (engram) | ⚠️ Real machinery, derived rows — phrase rows are computed from the model's *actual* embedding matrix and served via real mmap + LRU. It is **not** injected into the forward pass, because the loaded model was not trained with an engram table. (The real production reference: DeepSeek's conditional-memory table, trained into the checkpoint.) |
-| 177B "Qwen 3.8 Flash" | ❌ No public weights — the transcript's model. The 512-expert/10-active pattern is implemented for real by Qwen3-Next-80B-A3B, which fits 64GB. |
+| 180B Qwen3.8-Flash-Next | ✅ Available as `mlx-community/Qwen3.8-Flash-Next-4bit` (~105 GB). 48 layers, 512 experts, 10 active, 2560 hidden dim. Matches the transcript's architecture. |
 
 ## License
 

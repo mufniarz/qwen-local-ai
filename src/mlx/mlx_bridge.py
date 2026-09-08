@@ -13,13 +13,13 @@ Ties the real components together into one object:
 
 Honesty notes (kept in the code so they can't rot away):
 
-  * "Qwen 3.8 Flash" (177B, transcript) has no public open weights,
-    so QwenLocal targets *real* models — by default Qwen3-30B-A3B,
-    the real MoE that fits a 64GB M1 Max. Point ``model=`` at any
-    MLX repo to run something else.
-  * The real Qwen3-30B-A3B checkpoint contains its MoE router and
-    experts — ``self.moe`` is extracted from the *actual loaded
-    model* (real gate weights, real expert modules), not simulated.
+  * The real model from the transcript is Qwen3.8-Flash-Next (180B),
+    available as ``mlx-community/Qwen3.8-Flash-Next-4bit`` (~105 GB).
+    QwenLocal defaults to this model. Point ``model=`` at any MLX
+    repo to run something else (Qwen3-30B-A3B, Qwen3-235B-A22B, etc.).
+  * The loaded checkpoint contains its MoE router and experts —
+    ``self.moe`` is extracted from the *actual loaded model* (real gate
+    weights, real expert modules), not simulated.
   * The real phrase book is *derived* from the model's real embedding
     matrix (see real_engram's docstring for the reasoning) and is
     reported as a mechanism demo — it is NOT injected into the
@@ -28,7 +28,7 @@ Honesty notes (kept in the code so they can't rot away):
 
 CLI:
     .venv/bin/python -m src.mlx.mlx_bridge \
-        --model mlx-community/Qwen3-30B-A3B-4bit \
+        --model mlx-community/Qwen3.8-Flash-Next-4bit \
         --prompt "Explain mixture-of-experts routing in one paragraph" \
         --max-tokens 128
 """
@@ -67,7 +67,7 @@ class QwenLocal:
 
     def __init__(
         self,
-        model: str = "mlx-community/Qwen3-30B-A3B-4bit",
+        model: str = "mlx-community/Qwen3.8-Flash-Next-4bit",
         dtype: Optional[str] = None,
         engram_dir: Optional[str] = None,
         phrase_tokens: Optional[list] = None,
@@ -297,7 +297,7 @@ def main(argv=None) -> int:
         return 0
 
     model = args.model or (best_fit().repo if best_fit() else
-                           "mlx-community/Qwen3-30B-A3B-4bit")
+                           "mlx-community/Qwen3.8-Flash-Next-4bit")
 
     try:
         qwen = QwenLocal(

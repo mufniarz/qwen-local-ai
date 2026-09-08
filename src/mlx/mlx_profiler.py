@@ -65,13 +65,13 @@ class RealModel:
     is_moe: bool = False
     num_experts: int = 0
     top_k: int = 0
+    is_multimodal: bool = False
     has_engram: bool = False      # Ships with a real conditional-memory (engram) table
     notes: str = ""
 
 
 #: The real-model catalog. Sizes are approximate (4-bit MLX quants).
-#: Qwen3-Next-80B-A3B is the closest *real* match to the transcript's
-#: architecture: hybrid linear attention + MoE, 3B active per token.
+#: Qwen3.8 Flash Next is the real model from the transcript.
 REAL_MODEL_CATALOG: list[RealModel] = [
     RealModel(
         name="Qwen3 0.6B (dense)",
@@ -88,13 +88,15 @@ REAL_MODEL_CATALOG: list[RealModel] = [
               "The transcript's '512 experts / 10 active' pattern at real scale.",
     ),
     RealModel(
-        name="Qwen3 Next 80B-A3B (hybrid + MoE)",
-        repo="mlx-community/Qwen3-Next-80B-A3B-4bit",
-        total_params_b=80, active_params_b=3.0, size_gb_4bit=48.0,
+        name="Qwen3.8 Flash Next (hybrid + MoE + n-gram)",
+        repo="mlx-community/Qwen3.8-Flash-Next-4bit",
+        total_params_b=180, active_params_b=6.0, size_gb_4bit=105.0,
         is_moe=True, num_experts=512, top_k=10,
-        notes="Closest real analog of the transcript design: 512 experts, "
-              "10 active per token, hybrid gated-linear attention. "
-              "Fits 64GB but leaves little headroom for long contexts.",
+        is_multimodal=True,
+        notes="The real model from the transcript: 125B base + 51B n-gram "
+              "embedding (phrase book) + 4B MTP = ~180B total. 48 layers, "
+              "2560 hidden dim, 248K vocab, 20M bigram/trigram entries. "
+              "Fits a 128GB M5 Max; needs ~110GB SSD for download.",
     ),
     RealModel(
         name="Qwen3 235B-A22B (MoE)",
@@ -120,9 +122,10 @@ TRANSCRIPT_MODEL_177B = RealModel(
     repo="(no public open weights)",
     total_params_b=177, active_params_b=125, size_gb_4bit=160.0,
     is_moe=True, num_experts=512, top_k=10, has_engram=True,
-    notes="125B brain + 51B engram phrase book + 512 experts (10 active). "
-          "~82GB at 3-bit for the brain alone. No downloadable weights exist; "
-          "the mlx bridge targets the real models above until/if it is released.",
+    notes="Transcript described 125B brain + 51B phrase book = 177B. "
+          "Real model card says 125B with 6B activated + 51B n-gram + 4B MTP. "
+          "The real model (Qwen3.8-Flash-Next) matches the transcript's "
+          "architecture at 180B total, 48 layers, 512 experts, 10 active.",
 )
 
 

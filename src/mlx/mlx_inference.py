@@ -22,7 +22,7 @@ Install the real backend:
 Usage:
     from src.mlx.mlx_inference import MLXModelLoader
 
-    loader = MLXModelLoader("mlx-community/Qwen3-30B-A3B-4bit")
+    loader = MLXModelLoader("mlx-community/Qwen3.8-Flash-Next-4bit")
     loader.load()
     for tok in loader.generate("Write a solar system simulation"):
         print(tok, end="")
@@ -90,7 +90,7 @@ class MLXModelLoader:
 
     Args:
         model: A local directory with weights, or a Hugging Face repo id
-               (e.g. ``"mlx-community/Qwen3-30B-A3B-4bit"``).
+               (e.g. ``"mlx-community/Qwen3.8-Flash-Next-4bit"``).
         dtype: Optional MLX dtype override (e.g. ``"float16"``).
         download: Whether to fetch remote repos on load (default True).
     """
