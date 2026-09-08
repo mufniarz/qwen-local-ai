@@ -170,23 +170,38 @@ Python 3.13. Any Python 3.10+ works.)
 .venv/bin/python -m src.mlx.mlx_bridge --profile-only
 
 # 2. Run the real model from the transcript (Qwen3.8-Flash-Next, ~105 GB):
+#    Requires a 128GB+ Mac (M5 Max). For smaller machines, omit --model
+#    and the bridge auto-selects the largest model that fits:
 .venv/bin/python -m src.mlx.mlx_bridge \
     --model mlx-community/Qwen3.8-Flash-Next-4bit \
     --prompt "Explain mixture-of-experts routing in one paragraph" \
     --max-tokens 256
 
-# 3. With the real phrase book (built from the model's real embedding
+# 3. Auto-select the best model for your machine (omitting --model):
+.venv/bin/python -m src.mlx.mlx_bridge \
+    --prompt "Explain mixture-of-experts routing in one paragraph"
+
+# 4. With the real phrase book (built from the model's real embedding
 #    matrix, saved memory-mapped, page-fetched like the transcript's design):
 .venv/bin/python -m src.mlx.mlx_bridge \
     --model mlx-community/Qwen3.8-Flash-Next-4bit \
     --engram-dir ./engram \
     --prompt "..."
 
-# 4. Or run smaller models for testing:
+# 5. Or run the 30B-A3B (19 GB, fits 61GB RAM):
 .venv/bin/python -m src.mlx.mlx_bridge \
     --model mlx-community/Qwen3-30B-A3B-4bit \
     --prompt "..."
 ```
+
+### Which model should you use?
+
+| Your Machine | Recommended Model | Size (4-bit) | MoE Experts |
+|---|---|---|---|
+| 128GB+ Mac (M5 Max) | Qwen3.8-Flash-Next | 105 GB | 512 experts, 10 active |
+| 64GB Mac (M3 Pro) | Qwen3-30B-A3B | 19 GB | 128 experts, 8 active |
+| 32GB Mac | Qwen3-30B-A3B | 19 GB | 128 experts, 8 active |
+| 16GB Mac | Qwen3 0.6B (dense) | 0.5 GB | Dense (no MoE) |
 
 ### What is real, and what is still hypothetical
 

@@ -67,13 +67,25 @@ class QwenLocal:
 
     def __init__(
         self,
-        model: str = "mlx-community/Qwen3.8-Flash-Next-4bit",
+        model: Optional[str] = None,
         dtype: Optional[str] = None,
         engram_dir: Optional[str] = None,
         phrase_tokens: Optional[list] = None,
         build_engram: bool = True,
     ) -> None:
+        """
+        Initialize the bridge.
+
+        Args:
+            model: MLX model (HF repo id or local path). If ``None``,
+                ``best_fit()`` is called to pick the largest model that
+                fits your machine's unified memory (e.g. Qwen3-30B-A3B
+                for 61GB RAM, Qwen3.8-Flash-Next for 128GB+).
+        """
         self.hardware = profile_apple_silicon()
+        if model is None:
+            best = best_fit(self.hardware)
+            model = best.repo if best else "mlx-community/Qwen3-30B-A3B-4bit"
         self.loader = MLXModelLoader(model, dtype=dtype)
         self.loader.load()
         self.engram_dir = engram_dir
@@ -297,7 +309,7 @@ def main(argv=None) -> int:
         return 0
 
     model = args.model or (best_fit().repo if best_fit() else
-                           "mlx-community/Qwen3.8-Flash-Next-4bit")
+                           "mlx-community/Qwen3-30B-A3B-4bit")
 
     try:
         qwen = QwenLocal(
