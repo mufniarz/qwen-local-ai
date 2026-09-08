@@ -349,14 +349,48 @@ def dequantize_linear(module, backend: str = "numpy"):
     matmul runs its real (de)quantization, and multiplying by the
     identity extracts each weight exactly (no accumulation error).
 
+    For quantized modules (QuantizedLinear) that lack .in_features and
+    .out_features, dimensions are extracted from the weight tensor.
+
     Args:
         module: a module with ``weight`` + ``in_features``/``out_features``
         backend: "numpy" (default) or "mlx" for the return type.
     """
     import mlx.core as mx
 
-    out_dim = int(module.out_features)
-    in_dim = int(module.in_features)
+    # Extract dimensions from module attributes (plain Linear) or
+    # from the weight tensor (QuantizedLinear, etc.).
+    if hasattr(module, "out_features"):
+        out_dim = int(module.out_features)
+        in_dim = int(module.in_features)
+    else:
+        # QuantizedLinear: get shape from the weight tensor.
+        # QuantizedLinear stores group-wise quantized codes; the
+        # .weight attribute is the dequantized float32 array.
+        w = getattr(module, "weight", None)
+        if w is None:
+            # Try .data (codes) + .scales for group-quantized layout
+            codes = getattr(module, "data", None)
+            scales = getattr(module, "scales", None)
+            groups = int(getattr(module, "groups", 0) or 0)
+            bits = int(getattr(module, "bits", 4))
+            if codes is not None and scales is not None:
+                # Dequantize: (rows, cols//groups, groups)
+                c = np.asarray(codes).astype(np.int32)
+                s = np.asarray(scales).astype(np.float32)
+                deq = (c - (1 << (bits - 1))) / (1 << (bits - 1)) * s[:, :, None]
+                rows = c.shape[0]
+                cols = c.shape[1] * groups if groups else c.shape[1]
+                w = deq.reshape(rows, cols).astype(np.float32)
+            else:
+                raise RuntimeError(
+                    f"Cannot extract dimensions from {type(module).__name__} "
+                    "(no .out_features, no .weight, no .data/.scales)"
+                )
+        else:
+            w = np.asarray(w)
+        out_dim, in_dim = w.shape
+
     ident = mx.eye(in_dim).astype(mx.float32)
     y = module(ident).astype(mx.float32)  # (in, out) == Wᵀ
     bias = getattr(module, "bias", None)
