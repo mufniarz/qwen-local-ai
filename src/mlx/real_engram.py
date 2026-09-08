@@ -358,8 +358,27 @@ def dequantize_linear(module, backend: str = "numpy"):
     """
     import mlx.core as mx
 
-    # Extract dimensions from module attributes (plain Linear) or
-    # from the weight tensor (QuantizedLinear, etc.).
+    # For QuantizedLinear, directly dequantize the stored weights.
+    # The identity matrix trick doesn't work because the quantized
+    # matrix has a different expanded shape than the input.
+    if isinstance(module, mx.nn.QuantizedLinear):
+        codes = np.asarray(module.data).astype(np.int32)
+        scales = np.asarray(module.scales).astype(np.float32)
+        groups = int(getattr(module, "groups", 0) or 0)
+        bits = int(getattr(module, "bits", 4))
+        # Dequantize: (rows, cols//groups, groups)
+        deq = (codes - (1 << (bits - 1))) / (1 << (bits - 1)) * scales[:, :, None]
+        rows = codes.shape[0]
+        cols = codes.shape[1] * groups if groups else codes.shape[1]
+        w = deq.reshape(rows, cols).astype(np.float32)
+        bias = getattr(module, "bias", None)
+        if bias is not None:
+            w = w - np.asarray(bias).astype(np.float32)[:, None]
+        if backend == "mlx":
+            return mx.array(w)
+        return w
+
+    # Plain Linear: use the identity matrix trick.
     if hasattr(module, "out_features"):
         out_dim = int(module.out_features)
         in_dim = int(module.in_features)
